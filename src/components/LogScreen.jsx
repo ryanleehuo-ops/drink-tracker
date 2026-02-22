@@ -10,7 +10,7 @@ export default function LogScreen({ addDrink, drinks, settings }) {
   const [description, setDescription] = useState('')
   const [logged, setLogged] = useState(false)
   const now = new Date()
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0)
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7)); weekStart.setHours(0,0,0,0)
   const weekCount = drinks.filter(d => new Date(d.timestamp) >= weekStart).length
   const remaining = settings.weeklyLimit - weekCount
   const pct = Math.min((weekCount / settings.weeklyLimit) * 100, 100)

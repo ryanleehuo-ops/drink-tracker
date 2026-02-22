@@ -2,10 +2,10 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, ReferenceLine }
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns'
 const DRINK_EMOJI = { beer: '🍺', wine: '🍷', cocktail: '🍸', shot: '🥃' }
 const DRINK_COLOR = { beer: '#d4a017', wine: '#8b2252', cocktail: '#2980b9', shot: '#c0392b' }
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 export default function WeekScreen({ drinks, settings }) {
   const now = new Date()
-  const weekStart = startOfWeek(now)
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 })
   const dailyData = DAYS.map((day, i) => {
     const date = addDays(weekStart, i)
     const count = drinks.filter(d => isSameDay(new Date(d.timestamp), date)).length
