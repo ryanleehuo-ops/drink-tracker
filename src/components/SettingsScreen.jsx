@@ -26,7 +26,7 @@ export default function SettingsScreen({ settings, setSettings, drinks }) {
       </div>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10 }}>📋 Guidance</div>
-        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>UK NHS recommends no more than <strong style={{ color: 'var(--gold)' }}>14 units</strong> per week. US guidelines suggest up to <strong style={{ color: 'var(--gold)' }}>14</strong> for men and <strong style={{ color: 'var(--gold)' }}>7</strong> for women.</p>
+        <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>The CDC recommends no more than <strong style={{ color: 'var(--gold)' }}>14 units</strong> per week and surprisingly you're not an exception.</p>
       </div>
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 14 }}>All Time</div>
@@ -44,7 +44,7 @@ export default function SettingsScreen({ settings, setSettings, drinks }) {
         <button onClick={handleClear} style={{ width: '100%', padding: '13px', borderRadius: 'var(--radius-sm)', border: '1px solid #5a2020', background: 'transparent', color: '#c05050', fontSize: 14, cursor: 'pointer' }}>Clear All History</button>
       </div>
       <div style={{ textAlign: 'center', paddingBottom: 8 }}>
-        <p style={{ fontSize: 12, color: 'var(--text3)' }}>SipTracker v1.0 · Data stored on this device only</p>
+        <p style={{ fontSize: 12, color: 'var(--text3)' }}>SipTracker Beta · Data stored on this device only</p>
       </div>
     </div>
   )
