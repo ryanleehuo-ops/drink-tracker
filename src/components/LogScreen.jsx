@@ -8,14 +8,14 @@ const DRINK_TYPES = [
 ]
 
 function getStatusMessage(remaining, limit) {
-  const over = -remaining // how many over limit
+  const over = -remaining
 
-  if (remaining > 3)  return { text: `${remaining} drinks remaining`, color: 'var(--text2)' }
+  if (remaining > 3)   return { text: `${remaining} drinks remaining`, color: 'var(--text2)' }
   if (remaining === 3) return { text: `${remaining} drinks remaining — careful now`, color: 'var(--text2)' }
   if (remaining === 2) return { text: `${remaining} drinks remaining — good place to stop if you ask me`, color: 'var(--text2)' }
   if (remaining === 1) return { text: `${remaining} drink remaining — cutting it close I see...`, color: 'var(--amber)' }
-  if (remaining === 0) return { text: `⚠️ Limit reached — you realize ${limit} isn't a goal`, color: 'var(--red)' }
-  if (over === 1)      return { text: `${over} over limit — not a good look, was it neccessary?`, color: 'var(--red)' }
+  if (remaining === 0) return { text: `\u26a0\ufe0f Limit reached — you realize ${limit} isn't a goal`, color: 'var(--red)' }
+  if (over === 1)      return { text: `${over} over limit — not a good look, was it necessary?`, color: 'var(--red)' }
   if (over === 2)      return { text: `${over} over limit — what's your therapist going to say?`, color: 'var(--red)' }
   if (over === 3)      return { text: `${over} over limit — don't think this is helping you meet your future wife`, color: 'var(--red)' }
   if (over === 4)      return { text: `${over} over limit — FUCKING STOP!`, color: 'var(--red)' }
