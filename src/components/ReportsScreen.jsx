@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import {
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear,
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   format, subWeeks, eachWeekOfInterval, eachMonthOfInterval, addMonths,
-  getMonth
+  getMonth, getDaysInMonth
 } from 'date-fns'
 
 const DRINK_COLORS = { beer: '#d4a017', wine: '#8b2252', cocktail: '#2980b9', shot: '#c0392b' }
@@ -16,6 +16,15 @@ const VIEWS = [
   { id: 'alltime', label: 'All Time' },
 ]
 
+// Scale the weekly limit to match the period being displayed
+function scaledLimit(weeklyLimit, view, data) {
+  if (view === '4week') return weeklyLimit           // per week — unchanged
+  if (view === 'month') return weeklyLimit           // per week within month — unchanged
+  if (view === 'year') return weeklyLimit * 4.33    // per month (~4.33 weeks)
+  if (view === 'alltime') return weeklyLimit * 4.33 // per month
+  return weeklyLimit
+}
+
 function buildData(drinks, view, offsetMonth, offsetYear) {
   const now = new Date()
 
@@ -23,7 +32,7 @@ function buildData(drinks, view, offsetMonth, offsetYear) {
     const weekStart = startOfWeek(now, { weekStartsOn: 1 })
     const start = subWeeks(weekStart, 3)
     const weeks = eachWeekOfInterval({ start, end: now }, { weekStartsOn: 1 })
-    return weeks.map((ws, i) => {
+    return weeks.map((ws) => {
       const we = endOfWeek(ws, { weekStartsOn: 1 })
       const wd = drinks.filter(d => { const t = new Date(d.timestamp); return t >= ws && t <= we })
       const entry = { label: format(ws, 'MMM d'), total: wd.length }
@@ -53,7 +62,7 @@ function buildData(drinks, view, offsetMonth, offsetYear) {
     const start = new Date(targetYear, 0, 1)
     const end = targetYear === now.getFullYear() ? now : new Date(targetYear, 11, 31)
     const months = eachMonthOfInterval({ start, end })
-    return months.map((ms, i) => {
+    return months.map((ms) => {
       const me = endOfMonth(ms)
       const wd = drinks.filter(d => { const t = new Date(d.timestamp); return t >= ms && t <= me })
       const entry = { label: format(ms, 'MMM'), total: wd.length }
@@ -67,7 +76,7 @@ function buildData(drinks, view, offsetMonth, offsetYear) {
     const sorted = [...drinks].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     const first = startOfMonth(new Date(sorted[0].timestamp))
     const months = eachMonthOfInterval({ start: first, end: now })
-    return months.map((ms, i) => {
+    return months.map((ms) => {
       const me = endOfMonth(ms)
       const wd = drinks.filter(d => { const t = new Date(d.timestamp); return t >= ms && t <= me })
       const entry = {
@@ -84,7 +93,7 @@ function buildData(drinks, view, offsetMonth, offsetYear) {
   return []
 }
 
-const CustomTooltip = ({ active, payload, label, settings, view }) => {
+const CustomTooltip = ({ active, payload, label, settings, view, limit }) => {
   if (!active || !payload?.length) return null
   const total = payload.reduce((sum, p) => sum + (p.value || 0), 0)
   const isMonthly = view === 'year' || view === 'alltime'
@@ -99,9 +108,9 @@ const CustomTooltip = ({ active, payload, label, settings, view }) => {
           <span style={{ fontWeight: 600 }}>{p.value}</span>
         </div>
       ))}
-      <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', color: total > settings.weeklyLimit ? 'var(--red)' : 'var(--text)' }}>
+      <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', color: total > limit ? 'var(--red)' : 'var(--text)' }}>
         <span>Total</span>
-        <span style={{ fontWeight: 700 }}>{total}</span>
+        <span style={{ fontWeight: 700 }}>{total} / {Math.round(limit)}</span>
       </div>
     </div>
   )
@@ -124,6 +133,8 @@ export default function ReportsScreen({ drinks, settings }) {
 
   const now = new Date()
   const data = buildData(drinks, view, offsetMonth, offsetYear)
+  const limit = scaledLimit(settings.weeklyLimit, view, data)
+
   const currentMonthLabel = format(addMonths(new Date(now.getFullYear(), now.getMonth(), 1), offsetMonth), 'MMMM yyyy')
   const currentYearLabel = String(now.getFullYear() + offsetYear)
 
@@ -138,7 +149,7 @@ export default function ReportsScreen({ drinks, settings }) {
   const totalInView = data.reduce((sum, w) => sum + w.total, 0)
   const periods = data.length || 1
   const avgPerPeriod = (totalInView / periods).toFixed(1)
-  const periodsOverLimit = data.filter(w => w.total > settings.weeklyLimit).length
+  const periodsOverLimit = data.filter(w => w.total > limit).length
   const best = data.reduce((b, w) => w.total < b.total ? w : b, data[0] || { total: 0 })
   const worst = data.reduce((b, w) => w.total > b.total ? w : b, data[0] || { total: 0 })
 
@@ -149,6 +160,10 @@ export default function ReportsScreen({ drinks, settings }) {
   const showYearAxis = view === 'alltime'
   const tickInterval = view === 'alltime' && data.length > 12 ? Math.floor(data.length / 10) : 0
   const periodLabel = view === '4week' || view === 'month' ? 'week' : 'month'
+
+  const limitLabel = view === 'year' || view === 'alltime'
+    ? `~${Math.round(limit)} / month`
+    : `${settings.weeklyLimit} / week`
 
   return (
     <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 24 }} className="fade-up">
@@ -188,8 +203,13 @@ export default function ReportsScreen({ drinks, settings }) {
 
       {/* Chart */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '20px 8px 12px' }}>
-        <div style={{ fontSize: 13, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 16, paddingLeft: 12 }}>
-          {isMonthly ? 'Monthly Drinks by Type' : 'Weekly Drinks by Type'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingLeft: 12, paddingRight: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            {isMonthly ? 'Monthly Drinks by Type' : 'Weekly Drinks by Type'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>
+            limit: {limitLabel}
+          </div>
         </div>
         <ResponsiveContainer width="100%" height={showYearAxis ? 240 : 220}>
           <BarChart data={data} barCategoryGap="20%">
@@ -217,8 +237,8 @@ export default function ReportsScreen({ drinks, settings }) {
               tickLine={false}
               width={24}
             />
-            <Tooltip content={<CustomTooltip settings={settings} view={view} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-            <ReferenceLine y={settings.weeklyLimit} stroke="var(--red)" strokeDasharray="4 4" strokeOpacity={0.4} />
+            <Tooltip content={<CustomTooltip settings={settings} view={view} limit={limit} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+            <ReferenceLine y={limit} stroke="var(--red)" strokeDasharray="4 4" strokeOpacity={0.4} />
             {DRINK_TYPES.map(type => (
               <Bar key={type} dataKey={type} stackId="a" fill={DRINK_COLORS[type]}
                 radius={type === 'shot' ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
@@ -244,10 +264,10 @@ export default function ReportsScreen({ drinks, settings }) {
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {[
-          { label: `Avg / ${periodLabel}`, value: avgPerPeriod, sub: `limit: ${settings.weeklyLimit}`, color: avgPerPeriod > settings.weeklyLimit ? 'var(--red)' : 'var(--gold)' },
+          { label: `Avg / ${periodLabel}`, value: avgPerPeriod, sub: limitLabel, color: avgPerPeriod > limit ? 'var(--red)' : 'var(--gold)' },
           { label: `${periodLabel}s over limit`, value: periodsOverLimit, sub: `of ${data.length}`, color: periodsOverLimit > 0 ? 'var(--red)' : 'var(--green)' },
           { label: `Lightest ${periodLabel}`, value: best.total, sub: best.label || '—', color: 'var(--green)' },
-          { label: `Heaviest ${periodLabel}`, value: worst.total, sub: worst.label || '—', color: worst.total > settings.weeklyLimit ? 'var(--red)' : 'var(--amber)' },
+          { label: `Heaviest ${periodLabel}`, value: worst.total, sub: worst.label || '—', color: worst.total > limit ? 'var(--red)' : 'var(--amber)' },
         ].map(stat => (
           <div key={stat.label} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 34, fontWeight: 900, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
