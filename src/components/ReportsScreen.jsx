@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLin
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   format, subWeeks, eachWeekOfInterval, eachMonthOfInterval, addMonths,
-  getMonth, getDaysInMonth
+  getMonth, startOfYear
 } from 'date-fns'
 
 const DRINK_COLORS = { beer: '#d4a017', wine: '#8b2252', cocktail: '#2980b9', shot: '#c0392b' }
@@ -16,12 +16,11 @@ const VIEWS = [
   { id: 'alltime', label: 'All Time' },
 ]
 
-// Scale the weekly limit to match the period being displayed
-function scaledLimit(weeklyLimit, view, data) {
-  if (view === '4week') return weeklyLimit           // per week — unchanged
-  if (view === 'month') return weeklyLimit           // per week within month — unchanged
-  if (view === 'year') return weeklyLimit * 4.33    // per month (~4.33 weeks)
-  if (view === 'alltime') return weeklyLimit * 4.33 // per month
+function scaledLimit(weeklyLimit, view) {
+  if (view === '4week') return weeklyLimit
+  if (view === 'month') return weeklyLimit
+  if (view === 'year')  return weeklyLimit        // now weekly in year view
+  if (view === 'alltime') return weeklyLimit * 4.33
   return weeklyLimit
 }
 
@@ -59,13 +58,18 @@ function buildData(drinks, view, offsetMonth, offsetYear) {
 
   if (view === 'year') {
     const targetYear = now.getFullYear() + offsetYear
-    const start = new Date(targetYear, 0, 1)
+    const start = startOfYear(new Date(targetYear, 0, 1))
     const end = targetYear === now.getFullYear() ? now : new Date(targetYear, 11, 31)
-    const months = eachMonthOfInterval({ start, end })
-    return months.map((ms) => {
-      const me = endOfMonth(ms)
-      const wd = drinks.filter(d => { const t = new Date(d.timestamp); return t >= ms && t <= me })
-      const entry = { label: format(ms, 'MMM'), total: wd.length }
+    const weeks = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 })
+    return weeks.map((ws) => {
+      const we = endOfWeek(ws, { weekStartsOn: 1 })
+      const wd = drinks.filter(d => { const t = new Date(d.timestamp); return t >= ws && t <= we })
+      const entry = {
+        label: format(ws, 'MMM d'),
+        month: format(ws, 'MMM'),
+        isFirstOfMonth: format(ws, 'd') <= '7',
+        total: wd.length
+      }
       DRINK_TYPES.forEach(t => { entry[t] = wd.filter(d => d.type === t).length })
       return entry
     })
@@ -93,10 +97,10 @@ function buildData(drinks, view, offsetMonth, offsetYear) {
   return []
 }
 
-const CustomTooltip = ({ active, payload, label, settings, view, limit }) => {
+const CustomTooltip = ({ active, payload, label, view, limit }) => {
   if (!active || !payload?.length) return null
   const total = payload.reduce((sum, p) => sum + (p.value || 0), 0)
-  const isMonthly = view === 'year' || view === 'alltime'
+  const isMonthly = view === 'alltime'
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', fontSize: 13 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, marginBottom: 8, color: 'var(--text)' }}>
@@ -113,6 +117,17 @@ const CustomTooltip = ({ active, payload, label, settings, view, limit }) => {
         <span style={{ fontWeight: 700 }}>{total} / {Math.round(limit)}</span>
       </div>
     </div>
+  )
+}
+
+// Shows month label only on first week of each month in year view
+const MonthTick = ({ x, y, payload, data }) => {
+  const entry = data.find(d => d.label === payload.value)
+  if (!entry?.isFirstOfMonth) return null
+  return (
+    <text x={x} y={y + 14} fill="var(--text3)" fontSize={9} textAnchor="middle" fontFamily="DM Sans">
+      {entry.month}
+    </text>
   )
 }
 
@@ -133,7 +148,7 @@ export default function ReportsScreen({ drinks, settings }) {
 
   const now = new Date()
   const data = buildData(drinks, view, offsetMonth, offsetYear)
-  const limit = scaledLimit(settings.weeklyLimit, view, data)
+  const limit = scaledLimit(settings.weeklyLimit, view)
 
   const currentMonthLabel = format(addMonths(new Date(now.getFullYear(), now.getMonth(), 1), offsetMonth), 'MMMM yyyy')
   const currentYearLabel = String(now.getFullYear() + offsetYear)
@@ -156,14 +171,24 @@ export default function ReportsScreen({ drinks, settings }) {
   const typeTotals = {}
   DRINK_TYPES.forEach(t => { typeTotals[t] = data.reduce((sum, w) => sum + (w[t] || 0), 0) })
 
-  const isMonthly = view === 'year' || view === 'alltime'
+  const isYearWeekly = view === 'year'
+  const isMonthly = view === 'alltime'
+  const showMonthAxis = view === 'year'
   const showYearAxis = view === 'alltime'
-  const tickInterval = view === 'alltime' && data.length > 12 ? Math.floor(data.length / 10) : 0
-  const periodLabel = view === '4week' || view === 'month' ? 'week' : 'month'
+  const tickInterval = view === 'year'
+    ? Math.floor(data.length / 12)
+    : view === 'alltime' && data.length > 12
+    ? Math.floor(data.length / 10)
+    : 0
 
-  const limitLabel = view === 'year' || view === 'alltime'
+  // year view uses weekly period label, alltime uses monthly
+  const periodLabel = view === 'alltime' ? 'month' : 'week'
+
+  const limitLabel = view === 'alltime'
     ? `~${Math.round(limit)} / month`
     : `${settings.weeklyLimit} / week`
+
+  const barGap = view === 'year' ? '5%' : '20%'
 
   return (
     <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 24 }} className="fade-up">
@@ -211,8 +236,8 @@ export default function ReportsScreen({ drinks, settings }) {
             limit: {limitLabel}
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={showYearAxis ? 240 : 220}>
-          <BarChart data={data} barCategoryGap="20%">
+        <ResponsiveContainer width="100%" height={showMonthAxis || showYearAxis ? 240 : 220}>
+          <BarChart data={data} barCategoryGap={barGap}>
             <XAxis
               dataKey="label"
               tick={{ fill: 'var(--text3)', fontSize: 10, fontFamily: 'DM Sans' }}
@@ -220,6 +245,17 @@ export default function ReportsScreen({ drinks, settings }) {
               tickLine={false}
               interval={tickInterval}
             />
+            {showMonthAxis && (
+              <XAxis
+                xAxisId="month"
+                dataKey="label"
+                tick={<MonthTick data={data} />}
+                axisLine={false}
+                tickLine={false}
+                interval={0}
+                height={24}
+              />
+            )}
             {showYearAxis && (
               <XAxis
                 xAxisId="year"
@@ -237,7 +273,7 @@ export default function ReportsScreen({ drinks, settings }) {
               tickLine={false}
               width={24}
             />
-            <Tooltip content={<CustomTooltip settings={settings} view={view} limit={limit} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+            <Tooltip content={<CustomTooltip view={view} limit={limit} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
             <ReferenceLine y={limit} stroke="var(--red)" strokeDasharray="4 4" strokeOpacity={0.4} />
             {DRINK_TYPES.map(type => (
               <Bar key={type} dataKey={type} stackId="a" fill={DRINK_COLORS[type]}
