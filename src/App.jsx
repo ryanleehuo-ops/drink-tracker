@@ -73,7 +73,7 @@ export default function App() {
             textTransform: 'uppercase',
             letterSpacing: '1px',
             lineHeight: 1,
-          }}>days left so drink responsibly</span>
+          }}>days left. Drink responsibly</span>
         </div>
       </header>
 
